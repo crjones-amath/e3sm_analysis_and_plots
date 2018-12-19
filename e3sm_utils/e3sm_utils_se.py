@@ -13,7 +13,7 @@ Created on Wed Nov 21 12:28:15 2018
 import numpy as np
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs   # map plots
-from .map_utils import map_layout, map_axes_with_vertical_cb 
+from .map_utils import map_layout, map_axes_with_vertical_cb
 
 
 #####################################
@@ -82,6 +82,13 @@ def plot_profile_by_area(ds, variable, area, region, mask,
 
 def area_weighted_mean(da=None, area=None, ds=None, var=None):
     """area-weighted mean of dataArray da given an 'area' dataArray
+
+    Expected inputs either:
+        da - xarray dataArray
+        area - xarray dataArray with area entries corresponding to da
+    or:
+        ds - xarray dataSet containing data variables var and 'area'
+        var - name of variable for which to calculate area-weighted mean
     """
     if ds is not None and var is not None:
         return area_weighted_mean(da=ds[var], area=ds['area'])
@@ -95,7 +102,7 @@ def area_weighted_rmse(da, area):
 
 
 def toa_title(da, area, model_name, show_mean=True,
-              show_rmse=False, units="", fmt='{:.2g}'):
+              show_rmse=False, units="", fmt='{:.3g}'):
     """Calculate mean and/or RMSE and return string to use as title in plots
 
     inputs:
@@ -120,9 +127,29 @@ def toa_title(da, area, model_name, show_mean=True,
     return "{:12} {} {:>12}  ".format(mn, model_name, rmse) + units
 
 
+lat_lon_memo = {}
+def _get_plot_latlon(ds):
+    """Extract lat and lon (remapped to [-180, 180]) from E3SM-SE ds
+    """
+    grid_size = ds.attrs['ne']
+    if grid_size in lat_lon_memo:
+        return lat_lon_memo[grid_size]
+    # need to account for 'time' dimension if mfdataset:
+    if 'time' in ds['lat'].dims:
+        lat = ds['lat'].mean(dim='time').values
+        lon = ds['lon'].mean(dim='time').values
+    else:
+        lat = ds['lat'].values
+        lon = ds['lon'].values
+    lon[lon > 180] = lon[lon > 180] - 360
+    lat_lon_memo[grid_size] = (lat, lon)
+    return lat, lon
+
+
 def plot_global(v, ds, time_slice=None, projection=ccrs.PlateCarree(),
-                extent=None, rescale=1, units="", name='SP-ECPP',
+                extent=None, rescale=1, units="", name='SP',
                 mask_threshold=None, ilev=None, figsize=(8, 6),
+                plot_type='contourf',
                 **kwargs):
     """ 2D Map plot of time-mean of ds[v].
 
@@ -136,8 +163,11 @@ def plot_global(v, ds, time_slice=None, projection=ccrs.PlateCarree(),
         rescale - factor to rescale output by, so plotted_v = v * rescale
         units - optional string to specify units on map titles
         name - name used in plot title
-        cmap - optionally specify colormap
         mask_threshold - optionally mask out values below mask_threshold
+        ilev - for 3D output, optionally specify level index to show
+        figsize - size of figure
+        plot_type - ['contourf'] | 'pcolor'
+        **kwargs - passed into plotting routine
     """
     if time_slice is None and 'time' in ds:
         da = ds[v].mean(dim='time') * rescale
@@ -147,17 +177,20 @@ def plot_global(v, ds, time_slice=None, projection=ccrs.PlateCarree(),
         da = ds[v] * rescale
     if ilev is not None:
         da = da.isel(lev=ilev)
-    lat = ds['lat'].values
-    lon = ds['lon'].values
-    lon[lon > 180] = lon[lon > 180] - 360  # convert to -180, 180
-    # set title before masking because my global mean functions are dumb
+    lat, lon = _get_plot_latlon(ds)
+    if mask_threshold is not None:
+        da = da.where(da < mask_threshold)
+
+    # (I think I've fixed an earlier problem toa_title choked on nans)
     ax_title = toa_title(da, ds['area'], model_name=name,
                          show_mean=True, show_rmse=False, units=units)
-    if mask_threshold is not None:
-        da.values[da.values < mask_threshold] = np.nan
     fig, ax, cax = map_axes_with_vertical_cb(figsize=figsize,
                                              projection=projection)
-    p = ax.tripcolor(lon, lat, da, transform=ccrs.PlateCarree(), **kwargs)
+    if plot_type == 'contourf':
+        p = ax.tricontourf(lon, lat, da,
+                           transform=ccrs.PlateCarree(), **kwargs)
+    else:
+        p = ax.tripcolor(lon, lat, da, transform=ccrs.PlateCarree(), **kwargs)
     cb = plt.colorbar(p, cax=cax, label=v + " (" + units + ")")
     map_layout(ax, extent=extent)
     ax.set_title(ax_title)
