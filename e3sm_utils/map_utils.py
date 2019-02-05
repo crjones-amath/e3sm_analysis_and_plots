@@ -68,3 +68,14 @@ def map_axes_with_vertical_cb(figsize=(8, 6), projection=ccrs.PlateCarree()):
     cax = divider.append_axes('right', size='5%', pad=0.05,
                               axes_class=plt.Axes)
     return fig, ax, cax
+
+
+def multi_map_axes_vert_cb(nrows=3, ncols=1,
+                           figsize=(12, 8), projection=ccrs.PlateCarree()):
+    """Prepare fig,ax,cax for map plot on ax with cb on cax"""
+
+    fig, ax = plt.subplots(nrows=nrows, ncols=ncols, figsize=figsize,
+                           subplot_kw={'projection': projection})
+    cax = [make_axes_locatable(a).append_axes('right', size='5%', pad=0.05,
+                                              axes_class=plt.Axes) for a in ax]
+    return fig, ax, cax

@@ -12,6 +12,9 @@ Created on Wed Nov 21 12:28:15 2018
 # imports
 from . import e3sm_utils_se as ese
 from . import e3sm_utils_fv as efv
+from .map_utils import multi_map_axes_vert_cb
+from matplotlib.pyplot import cm
+import numpy as np
 
 
 def plot_global(v, ds, *args, **kwargs):
@@ -19,6 +22,49 @@ def plot_global(v, ds, *args, **kwargs):
         return ese.plot_global(v, ds, *args, **kwargs)
     else:
         return efv.plot_global(v, ds, *args, **kwargs)
+
+
+def plot_map_comparison(v, ds1, ds2, *args, **kwargs):
+    """Plot variable v in ds1 [top], ds2[middle], and ds2-ds1 (bottom)
+    """
+    # prepare axes
+    kwax = {}
+    if 'figsize' in kwargs:
+        kwax['figsize'] = kwargs['figsize']
+    if 'projection' in kwargs:
+        kwax['projection'] = kwargs['projection']
+    fig, ax, cax = multi_map_axes_vert_cb(nrows=3, ncols=1, **kwax)
+
+    # plot ds1, ds2
+    skip = ('cmap_div', 'vlim_div')
+    kwglobal = {key: val for key, val in kwargs.items() if key not in skip}
+    da1, *_ = plot_global(v, ds1, *args, ax=ax[0], cax=cax[0], **kwglobal)
+    da2, *_ = plot_global(v, ds2, *args, ax=ax[1], cax=cax[1], **kwglobal)
+
+    # plot difference
+    skip = ('vmin', 'vmax', 'vlim_div', 'cmap', 'cmap_div', 'levels',
+            'rescale')
+    kwdelta = {key: val for key, val in kwargs.items() if key not in skip}
+    kwdelta['cmap'] = cm.RdBu_r
+    if 'cmap_div' in kwargs:
+        kwdelta['cmap'] = kwargs['cmap_div']
+    da = da2 - da1
+    ds = da.to_dataset()
+    ds.attrs['ne'] = ds1.attrs['ne']
+    ds['area'] = ds1.area
+
+    if 'vlim_div' in kwargs:
+        vlim = kwargs['vlim_div']
+    else:
+        plot_data = da.values
+        calc_data = np.ravel(plot_data[np.isfinite(plot_data)])
+        vlim = max(abs(calc_data.max()), abs(calc_data.min()))
+    kwdelta.update(vmin=-vlim, vmax=vlim)
+    # print(vlim)
+    # print(kwdelta)
+    plot_global(v, ds, *args, ax=ax[2], cax=cax[2],
+                **kwdelta)
+    return ax, cax
 
 
 #def multi_model_canvas(n, figsize=None):

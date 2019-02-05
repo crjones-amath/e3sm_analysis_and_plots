@@ -16,11 +16,64 @@ import cartopy.crs as ccrs   # map plots
 from .map_utils import map_layout, map_axes_with_vertical_cb
 
 
+def area_weighted_mean(da=None, area=None, ds=None, var=None):
+    """area-weighted mean of dataArray da given an 'area' dataArray
+
+    Expected inputs either:
+        da - xarray dataArray
+        area - xarray dataArray with area entries corresponding to da
+    or:
+        ds - xarray dataSet containing data variables var and 'area'
+        var - name of variable for which to calculate area-weighted mean
+    """
+    if ds is not None and var is not None:
+        return area_weighted_mean(da=ds[var], area=ds['area'])
+    dsum = [d for d in da.dims if d != 'time']
+    return (da * area).sum(dim=dsum) / area.sum(dim=dsum)
 
 
-def plot_global(v, ds, time_slice=None, projection=ccrs.LambertCylindrical(),
-                extent=None, rescale=1, units="", name='SP2-ECPP',
-                cmap=None, mask_threshold=None, ilev=None, **kwargs):
+def area_weighted_rmse(da, area):
+    """area-weighted RMSE of anomaly da"""
+    return np.sqrt(area_weighted_mean(da ** 2, area))
+
+
+def toa_title(da, area, model_name, show_mean=True,
+              show_rmse=False, units="", fmt='{:.3g}'):
+    """Calculate mean and/or RMSE and return string to use as title in plots
+
+    inputs:
+        da - xarray dataarray with the data for spatial means
+        model_name - model name to include in string
+        show_mean - add global area-weighted mean to output string if true
+        show_rmse - add global area-weighted rmse to output string if true
+        units - optionally specify units
+        fmt - optionally specify formatting string form mean and rmse
+    output: string of form "(mean) (model_name) (rmse) (units)"
+    """
+    if show_mean:
+        mean_val = area_weighted_mean(da, area).values.item()
+        mn = ("Mean: " + fmt).format(mean_val)
+    else:
+        mn = ""
+    if show_rmse:
+        rmse_val = area_weighted_rmse(da, area).values.item()
+        rmse = ("RMSE: " + fmt).format(rmse_val)
+    else:
+        rmse = ""
+    return "{:12} {} {:>12}  ".format(mn, model_name, rmse) + units
+
+
+def plot_da_on_ax(ax, da, extent=None, **kwargs):
+    p = da.plot.contourf(ax=ax, **kwargs)
+    map_layout(ax, extent=extent)
+    return p
+
+
+def plot_global(v, ds, time_slice=None, projection=ccrs.PlateCarree(),
+                extent=None, rescale=1, units="", name='SP1',
+                figsize=(8, 6),
+                mask_threshold=None, ilev=None,
+                ax=None, cax=None, **kwargs):
     """ 2D Map plot of time-mean of ds[v].
 
     Arguments:
@@ -33,11 +86,14 @@ def plot_global(v, ds, time_slice=None, projection=ccrs.LambertCylindrical(),
         rescale - factor to rescale output by, so plotted_v = v * rescale
         units - optional string to specify units on map titles
         name - name used in plot title
-        cmap - optionally specify colormap
+        ax, cax - optionally specify map colorbar axes
         mask_threshold - optionally mask out values below mask_threshold
     """
     if time_slice is None and 'time' in ds:
-        da = ds[v].mean(dim='time') * rescale
+        try:
+            da = ds[v].mean(dim='time') * rescale
+        except:
+            da = ds[v] * rescale
     elif 'time' in ds:
         da = ds[v].sel(time=time_slice).mean(dim='time') * rescale
     else:
@@ -45,24 +101,25 @@ def plot_global(v, ds, time_slice=None, projection=ccrs.LambertCylindrical(),
     if ilev is not None:
         da = da.isel(lev=ilev)
 
-    # set title before masking because my global mean functions are dumb
-    ax_title = toa_title(da, ds['area'], model_name=name,
-                         show_mean=True, show_rmse=False, units=units)
+    # note: not sure I've done this right ...
     if mask_threshold is not None:
-        da.values[da.values < mask_threshold] = np.nan
-    fig, ax = plt.subplots(figsize=(8,6), subplot_kw={'projection': projection})
-
-    divider = make_axes_locatable(ax)
-    cax = divider.append_axes('right', size='5%', pad=0.05, axes_class=plt.Axes)
-    if cmap is None:
-        p = da.plot.contourf(ax=ax, transform=ccrs.PlateCarree(), cbar_ax=cax,
-                             robust=True)
-        # fig.colorbar(p, orientation='horizontal')
+        da = da.where(da < mask_threshold)
+        area = ds['area'].where(da < mask_threshold)
     else:
-        da.plot.contourf(ax=ax, transform=ccrs.PlateCarree(), cbar_ax=cax,
-                         robust=True, cmap=cmap)        
+        area = ds['area']
+    ax_title = toa_title(da, area, model_name=name,
+                         show_mean=True, show_rmse=False, units=units)
+    # create axes if needed
+    if ax is None:
+        fig, ax, cax_tmp = map_axes_with_vertical_cb(figsize=figsize,
+                                                     projection=projection)
+        if cax is None:
+            cax = cax_tmp
+    da.plot.contourf(ax=ax, transform=ccrs.PlateCarree(), cbar_ax=cax,
+                     robust=True, **kwargs)
     map_layout(ax, extent=extent)
     ax.set_title(ax_title)
+    return da, ax, cax
     
 def multi_model_canvas(n, figsize=None):
     """subplot array (nrows, ncols) = (n, n+1) with last column scaled 5% for colorbar

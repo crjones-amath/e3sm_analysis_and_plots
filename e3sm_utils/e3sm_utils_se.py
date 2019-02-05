@@ -146,10 +146,22 @@ def _get_plot_latlon(ds):
     return lat, lon
 
 
+def plot_da_on_ax(ax, lon, lat, da, plot_type='contourf', extent=None,
+                  **kwargs):
+    if plot_type == 'contourf':
+        p = ax.tricontourf(lon, lat, da,
+                           transform=ccrs.PlateCarree(), **kwargs)
+    else:
+        p = ax.tripcolor(lon, lat, da, transform=ccrs.PlateCarree(), **kwargs)
+    map_layout(ax, extent=extent)
+    return p
+
+
 def plot_global(v, ds, time_slice=None, projection=ccrs.PlateCarree(),
                 extent=None, rescale=1, units="", name='SP',
                 mask_threshold=None, ilev=None, figsize=(8, 6),
                 plot_type='contourf',
+                ax=None, cax=None,
                 **kwargs):
     """ 2D Map plot of time-mean of ds[v].
 
@@ -167,10 +179,16 @@ def plot_global(v, ds, time_slice=None, projection=ccrs.PlateCarree(),
         ilev - for 3D output, optionally specify level index to show
         figsize - size of figure
         plot_type - ['contourf'] | 'pcolor'
+        ax, cax - optionally specify plot axis and colorbar axis
+                  if None, create plot on new figure / ax / cax
         **kwargs - passed into plotting routine
     """
+    # prepare data to plot:
     if time_slice is None and 'time' in ds:
-        da = ds[v].mean(dim='time') * rescale
+        try:
+            da = ds[v].mean(dim='time') * rescale
+        except:
+            da = ds[v] * rescale
     elif 'time' in ds:
         da = ds[v].sel(time=time_slice).mean(dim='time') * rescale
     else:
@@ -178,20 +196,27 @@ def plot_global(v, ds, time_slice=None, projection=ccrs.PlateCarree(),
     if ilev is not None:
         da = da.isel(lev=ilev)
     lat, lon = _get_plot_latlon(ds)
+    # note: not sure I've done this right ...
     if mask_threshold is not None:
         da = da.where(da < mask_threshold)
-
-    # (I think I've fixed an earlier problem toa_title choked on nans)
-    ax_title = toa_title(da, ds['area'], model_name=name,
-                         show_mean=True, show_rmse=False, units=units)
-    fig, ax, cax = map_axes_with_vertical_cb(figsize=figsize,
-                                             projection=projection)
-    if plot_type == 'contourf':
-        p = ax.tricontourf(lon, lat, da,
-                           transform=ccrs.PlateCarree(), **kwargs)
+        area = ds['area'].where(da < mask_threshold)
     else:
-        p = ax.tripcolor(lon, lat, da, transform=ccrs.PlateCarree(), **kwargs)
-    cb = plt.colorbar(p, cax=cax, label=v + " (" + units + ")")
-    map_layout(ax, extent=extent)
+        area = ds['area']
+    # (I think I've fixed an earlier problem toa_title choked on nans)
+    ax_title = toa_title(da, area, model_name=name,
+                         show_mean=True, show_rmse=False, units=units)
+    # create axes if needed
+    if ax is None:
+        fig, ax, cax_tmp = map_axes_with_vertical_cb(figsize=figsize,
+                                                     projection=projection)
+        if cax is None:
+            cax = cax_tmp
+    p = plot_da_on_ax(ax, lon, lat, da, plot_type=plot_type, extent=extent,
+                      **kwargs)
+    # add colorbar
+    if cax is not None:
+        cb = plt.colorbar(p, cax=cax, label=v + " (" + units + ")")
+    else:
+        cb = None
     ax.set_title(ax_title)
-    return fig, ax, cax, cb
+    return da, ax, cax, cb
