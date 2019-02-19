@@ -5,6 +5,7 @@ This module contains definitions running ACME-ECP model.
 @author: christopher.jones@pnnl.gov
 """
 
+from __future__ import print_function
 import os
 import subprocess
 import xml.etree.ElementTree as ET
@@ -86,11 +87,11 @@ def print_os_command(os_cmd, cwd=None):
         subprocess_args = str(cmd_to_execute)
     else:
         subprocess_args = str(cmd_to_execute) + ', cwd=' + cwd
-    print "------------------------------------------------------------------"
-    print "os cmd: " + cmd_to_print
-    print "python call:"
-    print " subprocess.run(" + subprocess_args + ")"
-    print "------------------------------------------------------------------"
+    print("------------------------------------------------------------------")
+    print("os cmd: " + cmd_to_print)
+    print("python call:")
+    print("subprocess.run(" + subprocess_args + ")")
+    print("------------------------------------------------------------------")
 
 
 def common_cam_config_opts(name):
@@ -148,11 +149,6 @@ def common_cam_config_opts(name):
         return opts[name]
     else:
         raise KeyError
-
-def common_cam_namelist(name):
-    """Stencil for common cam namelist options"""
-    cam_nl = {'SP1': None,
-              'nochem': None}
 
 # ###########################
 # Class definitions
@@ -281,7 +277,7 @@ class Case(object):
 
     def xmlchanges(self, xmlfile, verbose=False, test=True, **kwargs):
         """ Make change(s) to xmlfile using keyword args"""
-        for key, val in kwargs.iteritems():
+        for key, val in kwargs.items():
             self.xmlchange(xmlfile, key, str(val), verbose=verbose, test=test)
 
     def xmlread(self, xmlfile):
@@ -386,7 +382,7 @@ class Case(object):
         xmlfile = "env_run.xml"
         xml_contents = self._default_env_run_config()
         xml_contents.update(kwargs)
-        for entry, val in xml_contents.iteritems():
+        for entry, val in xml_contents.items():
             self.xmlchange(xmlfile, entry, str(val), test=test)
 
     def config_env_batch(self, test=True, **kwargs):
@@ -397,7 +393,7 @@ class Case(object):
             self._nproc = min(num_elements(self.res))  # conservative estimate
         xml_contents = {"JOB_WALLCLOCK_TIME": max_wallclock_time(self._nproc)}
         xml_contents.update(kwargs)
-        for entry, val in xml_contents.iteritems():
+        for entry, val in xml_contents.items():
             self.xmlchange(xmlfile, entry, str(val), test=test)
 
     def submit(self, test=trial_run, *args):
@@ -463,9 +459,9 @@ class Case(object):
                               test=test)
 
         # replace date with ref_date:
-        pat = '\.\d{4}-\d{2}-\d{2}'  # date to replace
+        pat = r'\.\d{4}-\d{2}-\d{2}'  # date to replace
         filelist = glob.glob(self.Directory.run_dir+"/rpointer*")
-        print "Replacing dates in rpointer.* with "+ref_date
+        print("Replacing dates in rpointer.* with "+ref_date)
         for FILE in filelist:
             with open(FILE, 'r') as f:
                 lines = f.read()
@@ -488,15 +484,15 @@ class AcmeDirectory:
         self.src_dir = src_dir
         self.case_dir = top_dir + "Cases/" + case_name
         self._set_scratch_dir(scratch_dir)
-        self.scratch_case_dir = self.scratch_dir+"/"+case_name
-        self.bld_dir = self.scratch_case_dir+"/bld"
-        self.run_dir = self.scratch_case_dir+"/run"
+        if self.scratch_dir is not None:
+            self.scratch_case_dir = self.scratch_dir+"/"+case_name
+            self.bld_dir = self.scratch_case_dir+"/bld"
+            self.run_dir = self.scratch_case_dir+"/run"
         self.cam_namelist_file = self.case_dir + "/user_nl_cam"
 
     def _set_scratch_dir(self, scratch_dir):
-        if scratch_dir is not None:
-            self.scratch_dir = scratch_dir
-        else:
+        self.scratch_dir = scratch_dir
+        if self.scratch_dir is None:
             if "cori" in AcmeDirectory.host:
                 self.scratch_dir = os.getenv("CSCRATCH") + "/acme_scratch/cori-knl"
             elif "titan" in AcmeDirectory.host:
