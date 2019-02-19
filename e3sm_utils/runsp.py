@@ -415,11 +415,12 @@ class Case(object):
             namelist = self.namelist
         with open(filename, write_option) as f:
             for key, val in namelist.items():
-                line = " " + key + " = " + val + "\n"
+                line = " " + key + " = " + str(val) + "\n"
                 f.write(line)
 
     def append_namelist_to_file(self, filename=None, **kwargs):
-        self.write_namelist_to_file(filename=filename, namelist=kwargs,
+        nl = kwargs if kwargs else None
+        self.write_namelist_to_file(filename=filename, namelist=nl,
                                     write_option='a')
 
     def update_namelist(self, **kwargs):
