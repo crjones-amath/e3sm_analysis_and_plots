@@ -124,24 +124,24 @@ def common_cam_config_opts(name):
                            '-chem': 'linoz_mam4_resus_mom_soag',
                            '-rain_evap_to_coarse_aero': None,
                            '-bc_dep_to_snow_updates': None,
-                           '-cppdefs': "'-DSP_DIR_NS -DAPPLY_POST_DECK_BUGFIXES'"},
+                           '-cppdefs': "'-DSP_DIR_NS'"},
             'SP2_ECPP': {'-use_SPCAM': None,
-                    '-rad': 'rrtmg',
-                    '-phys': 'cam5',
-                    '-nlev': '72',
-                    '-crm_nz': '58',
-                    '-crm_adv': 'MPDATA',
-                    '-crm_nx': '64',
-                    '-crm_ny': '1',
-                    '-crm_dx': '2000',
-                    '-crm_dt': '5',
-                    '-microphys': 'mg2',
-                    '-SPCAM_microp_scheme': 'm2005',
-                    '-chem': 'linoz_mam4_resus_mom_soag',
-                    '-rain_evap_to_coarse_aero': None,
-                    '-bc_dep_to_snow_updates': None,
-                    '-use_ECPP': None,
-                    '-cppdefs': "'-DSP_DIR_NS -DAPPLY_POST_DECK_BUGFIXES'"},
+                         '-rad': 'rrtmg',
+                         '-phys': 'cam5',
+                         '-nlev': '72',
+                         '-crm_nz': '58',
+                         '-crm_adv': 'MPDATA',
+                         '-crm_nx': '64',
+                         '-crm_ny': '1',
+                         '-crm_dx': '2000',
+                         '-crm_dt': '5',
+                         '-microphys': 'mg2',
+                         '-SPCAM_microp_scheme': 'm2005',
+                         '-chem': 'linoz_mam4_resus_mom_soag',
+                         '-rain_evap_to_coarse_aero': None,
+                         '-bc_dep_to_snow_updates': None,
+                         '-use_ECPP': None,
+                         '-cppdefs': "'-DSP_DIR_NS'"},
             'E3SM_RRTMGP': {'-rad': 'rrtmgp',
                             '-phys': 'cam5'}
             }
@@ -267,18 +267,21 @@ class Case(object):
         args.extend(extra_args)
         self._system_call([cmd] + args, test=test)
 
-    def xmlchange(self, xmlfile, variable, value, verbose=True, test=True):
+    def xmlchange(self, variable, value, xmlfile=None, verbose=True, test=True):
         """Make single change variable=value to xmlfile
         """
-        os_cmd = "./xmlchange -file " + xmlfile + \
-            " -id " + variable + " -val " + value
+        if xmlfile is not None:
+            os_cmd = "./xmlchange -file " + xmlfile + \
+                " -id " + variable + " -val " + value
+        else:
+            os_cmd = "./xmlchange " + "=".join([variable, value])
         self._system_call(os_cmd, cwd=self.Directory.case_dir,
                           test=test, verbose=verbose)
 
-    def xmlchanges(self, xmlfile, verbose=False, test=True, **kwargs):
+    def xmlchanges(self, xmlfile=None, verbose=False, test=True, **kwargs):
         """ Make change(s) to xmlfile using keyword args"""
         for key, val in kwargs.items():
-            self.xmlchange(xmlfile, key, str(val), verbose=verbose, test=test)
+            self.xmlchange(key, str(val), xmlfile, verbose=verbose, test=test)
 
     def xmlread(self, xmlfile):
         """ returns a dictionary of entry id's and values from xmlfile
@@ -335,7 +338,8 @@ class Case(object):
             self._system_call("./case.setup",
                               cwd=self.Directory.case_dir, test=test)
 
-    def set_cam_config_opts(self, test=True, default_set=None, dict_pop=None, **kwargs):
+    def set_cam_config_opts(self, test=True, default_set=None,
+                            dict_pop=None, **kwargs):
         """Sets CAM_CONFIG_OPTS in env_build.xml
         """
         cam_opt_dict = {}
@@ -382,8 +386,7 @@ class Case(object):
         xmlfile = "env_run.xml"
         xml_contents = self._default_env_run_config()
         xml_contents.update(kwargs)
-        for entry, val in xml_contents.items():
-            self.xmlchange(xmlfile, entry, str(val), test=test)
+        self.xmlchanges(xmlfile, test=test, **xml_contents)
 
     def config_env_batch(self, test=True, **kwargs):
         """Update env_batch.xml
@@ -393,8 +396,7 @@ class Case(object):
             self._nproc = min(num_elements(self.res))  # conservative estimate
         xml_contents = {"JOB_WALLCLOCK_TIME": max_wallclock_time(self._nproc)}
         xml_contents.update(kwargs)
-        for entry, val in xml_contents.items():
-            self.xmlchange(xmlfile, entry, str(val), test=test)
+        self.xmlchanges(xmlfile, test=test, **xml_contents)
 
     def submit(self, test=trial_run, *args):
         """ submit the file
@@ -402,8 +404,6 @@ class Case(object):
         subfile = "./case.submit"
         self._system_call([subfile] + list(args),
                           cwd=self.Directory.case_dir, test=test)
-        #self._system_call(subfile + " -a '-A csc249adse15'",
-        #                  cwd=self.Directory.case_dir, test=test)
 
     def write_namelist_to_file(self, filename=None, namelist=None,
                                write_option='w'):
@@ -509,8 +509,8 @@ compsets = ('F20TRC5AV1C-04P2', 'FC5AV1C-L',
             'F20TRSP1V1', 'F20TRSP2V1')
 
 cam_namelist_for_acme = {
-        "ext_frc_cycle_yr": "2000",
-        "ext_frc_specifier": """'SO2         -> /lustre/atlas/world-shared/cli900/cesm/inputdata/atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_so2_elev_2000_c120315.nc',
+    "ext_frc_cycle_yr": "2000",
+    "ext_frc_specifier": """'SO2         -> /lustre/atlas/world-shared/cli900/cesm/inputdata/atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_so2_elev_2000_c120315.nc',
          'SOAG        -> /lustre/atlas/world-shared/cli900/cesm/inputdata/atm/cam/chem/trop_mozart_aero/emis/aces4bgc_nvsoa_soag_elev_2000_c160427.nc',
          'bc_a4       -> /lustre/atlas/world-shared/cli900/cesm/inputdata/atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_bc_elev_2000_c120315.nc',
          'num_a1      -> /lustre/atlas/world-shared/cli900/cesm/inputdata/atm/cam/chem/trop_mozart_aero/emis/ar5_mam7_num_a1_elev_2000_c120716.nc',
@@ -519,9 +519,9 @@ cam_namelist_for_acme = {
          'pom_a4      -> /lustre/atlas/world-shared/cli900/cesm/inputdata/atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_pom_elev_2000_c130422.nc',
          'so4_a1      -> /lustre/atlas/world-shared/cli900/cesm/inputdata/atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_so4_a1_elev_2000_c120315.nc',
          'so4_a2      -> /lustre/atlas/world-shared/cli900/cesm/inputdata/atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_so4_a2_elev_2000_c120315.nc'""",
-         "ext_frc_type": "'CYCLICAL'",
-         "srf_emis_cycle_yr": "2000",
-         "srf_emis_specifier": """'DMS       -> /lustre/atlas/world-shared/cli900/cesm/inputdata/atm/cam/chem/trop_mozart_aero/emis/DMSflux.2000.1deg_latlon_conserv.POPmonthlyClimFromACES4BGC_c20160226.nc',
+    "ext_frc_type": "'CYCLICAL'",
+    "srf_emis_cycle_yr": "2000",
+    "srf_emis_specifier": """'DMS       -> /lustre/atlas/world-shared/cli900/cesm/inputdata/atm/cam/chem/trop_mozart_aero/emis/DMSflux.2000.1deg_latlon_conserv.POPmonthlyClimFromACES4BGC_c20160226.nc',
          'SO2       -> /lustre/atlas/world-shared/cli900/cesm/inputdata/atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_so2_surf_2000_c120315.nc',
          'bc_a4     -> /lustre/atlas/world-shared/cli900/cesm/inputdata/atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_bc_surf_2000_c120315.nc',
          'num_a1    -> /lustre/atlas/world-shared/cli900/cesm/inputdata/atm/cam/chem/trop_mozart_aero/emis/ar5_mam7_num_a1_surf_2000_c120716.nc',
@@ -530,42 +530,42 @@ cam_namelist_for_acme = {
          'pom_a4    -> /lustre/atlas/world-shared/cli900/cesm/inputdata/atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_pom_surf_2000_c130422.nc',
          'so4_a1    -> /lustre/atlas/world-shared/cli900/cesm/inputdata/atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_so4_a1_surf_2000_c120315.nc',
          'so4_a2    -> /lustre/atlas/world-shared/cli900/cesm/inputdata/atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_so4_a2_surf_2000_c120315.nc'""",
-         "srf_emis_type": "'CYCLICAL'",
-         "tracer_cnst_cycle_yr": "2000",
-         "tracer_cnst_datapath": "'/lustre/atlas/world-shared/cli900/cesm/inputdata/atm/cam/chem/trop_mozart_aero/oxid'",
-         "tracer_cnst_file": "'oxid_1.9x2.5_L26_1850-2005_c091123.nc'",
-         "tracer_cnst_filelist": "'oxid_1.9x2.5_L26_clim_list.c090805.txt'",
-         "tracer_cnst_specifier": "'cnst_O3:O3','OH','NO3','HO2'",
-         "tracer_cnst_type": "'CYCLICAL'",
-         "prescribed_ozone_cycle_yr": "2000",
-         "prescribed_ozone_type": "'CYCLICAL'"
-        }
+    "srf_emis_type": "'CYCLICAL'",
+    "tracer_cnst_cycle_yr": "2000",
+    "tracer_cnst_datapath": "'/lustre/atlas/world-shared/cli900/cesm/inputdata/atm/cam/chem/trop_mozart_aero/oxid'",
+    "tracer_cnst_file": "'oxid_1.9x2.5_L26_1850-2005_c091123.nc'",
+    "tracer_cnst_filelist": "'oxid_1.9x2.5_L26_clim_list.c090805.txt'",
+    "tracer_cnst_specifier": "'cnst_O3:O3','OH','NO3','HO2'",
+    "tracer_cnst_type": "'CYCLICAL'",
+    "prescribed_ozone_cycle_yr": "2000",
+    "prescribed_ozone_type": "'CYCLICAL'"
+}
 
 cam_namelist_for_nudging = {
-        "Nudge_Model": ".True.",
-        "Nudge_Path": "'/lustre/atlas/proj-shared/csc249/crjones/era-interim/ne30/'",
-        "Nudge_File_Template": "'regrid_IE_ne30.cam2.i.%y-%m-%d-%s.nc'",
-        "Nudge_Times_Per_Day": "4",
-        "Model_Times_Per_Day": "48",
-        "Nudge_Uprof": "1",
-        "Nudge_Ucoef": "1.",
-        "Nudge_Vprof": "1",
-        "Nudge_Vcoef": "1.",
-        "Nudge_Tprof": "0",
-        "Nudge_Tcoef": "0.",
-        "Nudge_Qprof": "0",
-        "Nudge_Qcoef": "0.",
-        "Nudge_PSprof": "0",
-        "Nudge_PScoef": "0.",
-        "Nudge_Beg_Year": "0000",
-        "Nudge_Beg_Month": "1",
-        "Nudge_Beg_Day": "1",
-        "Nudge_End_Year": "9999",
-        "Nudge_End_Month": "1",
-        "Nudge_End_Day": "1",
-        "inithist": "'DAILY'",
-        "ext_frc_cycle_yr": "2000",
-        "ext_frc_specifier": """'SO2         -> /lustre/atlas/world-shared/cli900/cesm/inputdata/atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_so2_elev_2000_c120315.nc',
+    "Nudge_Model": ".True.",
+    "Nudge_Path": "'/lustre/atlas/proj-shared/csc249/crjones/era-interim/ne30/'",
+    "Nudge_File_Template": "'regrid_IE_ne30.cam2.i.%y-%m-%d-%s.nc'",
+    "Nudge_Times_Per_Day": "4",
+    "Model_Times_Per_Day": "48",
+    "Nudge_Uprof": "1",
+    "Nudge_Ucoef": "1.",
+    "Nudge_Vprof": "1",
+    "Nudge_Vcoef": "1.",
+    "Nudge_Tprof": "0",
+    "Nudge_Tcoef": "0.",
+    "Nudge_Qprof": "0",
+    "Nudge_Qcoef": "0.",
+    "Nudge_PSprof": "0",
+    "Nudge_PScoef": "0.",
+    "Nudge_Beg_Year": "0000",
+    "Nudge_Beg_Month": "1",
+    "Nudge_Beg_Day": "1",
+    "Nudge_End_Year": "9999",
+    "Nudge_End_Month": "1",
+    "Nudge_End_Day": "1",
+    "inithist": "'DAILY'",
+    "ext_frc_cycle_yr": "2000",
+    "ext_frc_specifier": """'SO2         -> /lustre/atlas/world-shared/cli900/cesm/inputdata/atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_so2_elev_2000_c120315.nc',
          'SOAG        -> /lustre/atlas/world-shared/cli900/cesm/inputdata/atm/cam/chem/trop_mozart_aero/emis/aces4bgc_nvsoa_soag_elev_2000_c160427.nc',
          'bc_a4       -> /lustre/atlas/world-shared/cli900/cesm/inputdata/atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_bc_elev_2000_c120315.nc',
          'num_a1      -> /lustre/atlas/world-shared/cli900/cesm/inputdata/atm/cam/chem/trop_mozart_aero/emis/ar5_mam7_num_a1_elev_2000_c120716.nc',
@@ -574,9 +574,9 @@ cam_namelist_for_nudging = {
          'pom_a4      -> /lustre/atlas/world-shared/cli900/cesm/inputdata/atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_pom_elev_2000_c130422.nc',
          'so4_a1      -> /lustre/atlas/world-shared/cli900/cesm/inputdata/atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_so4_a1_elev_2000_c120315.nc',
          'so4_a2      -> /lustre/atlas/world-shared/cli900/cesm/inputdata/atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_so4_a2_elev_2000_c120315.nc'""",
-         "ext_frc_type": "'CYCLICAL'",
-         "srf_emis_cycle_yr": "2000",
-         "srf_emis_specifier": """'DMS       -> /lustre/atlas/world-shared/cli900/cesm/inputdata/atm/cam/chem/trop_mozart_aero/emis/DMSflux.2000.1deg_latlon_conserv.POPmonthlyClimFromACES4BGC_c20160226.nc',
+    "ext_frc_type": "'CYCLICAL'",
+    "srf_emis_cycle_yr": "2000",
+    "srf_emis_specifier": """'DMS       -> /lustre/atlas/world-shared/cli900/cesm/inputdata/atm/cam/chem/trop_mozart_aero/emis/DMSflux.2000.1deg_latlon_conserv.POPmonthlyClimFromACES4BGC_c20160226.nc',
          'SO2       -> /lustre/atlas/world-shared/cli900/cesm/inputdata/atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_so2_surf_2000_c120315.nc',
          'bc_a4     -> /lustre/atlas/world-shared/cli900/cesm/inputdata/atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_bc_surf_2000_c120315.nc',
          'num_a1    -> /lustre/atlas/world-shared/cli900/cesm/inputdata/atm/cam/chem/trop_mozart_aero/emis/ar5_mam7_num_a1_surf_2000_c120716.nc',
@@ -585,16 +585,16 @@ cam_namelist_for_nudging = {
          'pom_a4    -> /lustre/atlas/world-shared/cli900/cesm/inputdata/atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_pom_surf_2000_c130422.nc',
          'so4_a1    -> /lustre/atlas/world-shared/cli900/cesm/inputdata/atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_so4_a1_surf_2000_c120315.nc',
          'so4_a2    -> /lustre/atlas/world-shared/cli900/cesm/inputdata/atm/cam/chem/trop_mozart_aero/emis/ar5_mam3_so4_a2_surf_2000_c120315.nc'""",
-         "srf_emis_type": "'CYCLICAL'",
-         "tracer_cnst_cycle_yr": "2000",
-         "tracer_cnst_datapath": "'/lustre/atlas/world-shared/cli900/cesm/inputdata/atm/cam/chem/trop_mozart_aero/oxid'",
-         "tracer_cnst_file": "'oxid_1.9x2.5_L26_1850-2005_c091123.nc'",
-         "tracer_cnst_filelist": "'oxid_1.9x2.5_L26_clim_list.c090805.txt'",
-         "tracer_cnst_specifier": "'cnst_O3:O3','OH','NO3','HO2'",
-         "tracer_cnst_type": "'CYCLICAL'",
-         "prescribed_ozone_cycle_yr": "2000",
-         "prescribed_ozone_type": "'CYCLICAL'"
-         }
+    "srf_emis_type": "'CYCLICAL'",
+    "tracer_cnst_cycle_yr": "2000",
+    "tracer_cnst_datapath": "'/lustre/atlas/world-shared/cli900/cesm/inputdata/atm/cam/chem/trop_mozart_aero/oxid'",
+    "tracer_cnst_file": "'oxid_1.9x2.5_L26_1850-2005_c091123.nc'",
+    "tracer_cnst_filelist": "'oxid_1.9x2.5_L26_clim_list.c090805.txt'",
+    "tracer_cnst_specifier": "'cnst_O3:O3','OH','NO3','HO2'",
+    "tracer_cnst_type": "'CYCLICAL'",
+    "prescribed_ozone_cycle_yr": "2000",
+    "prescribed_ozone_type": "'CYCLICAL'"
+}
 
 cam_namelist_hindcast_sp = {
     "iradsw": "1",
@@ -603,25 +603,25 @@ cam_namelist_hindcast_sp = {
     "mfilt": "1,24,24,24,1",
     "fincl2": "'T','Q','Z3','OMEGA','U','V','CLOUD'",
     "fincl3": "'TS','TMQ','PRECT','TREFHT','LHFLX','SHFLX',"
-        "'FLNS','FLNT','FSNS','FSNT','FLUT',"
-        "'CLDLOW','CLDMED','CLDHGH','CLDTOT',"
-        "'U850','U200','V850','V200','OMEGA500',"
-        "'LWCF','SWCF','PS','PSL','QAP:A','TAP:A','PRECC','PRECL'",
+              "'FLNS','FLNT','FSNS','FSNT','FLUT',"
+              "'CLDLOW','CLDMED','CLDHGH','CLDTOT',"
+              "'U850','U200','V850','V200','OMEGA500',"
+              "'LWCF','SWCF','PS','PSL','QAP:A','TAP:A','PRECC','PRECL'",
     "fincl4": "'DTCORE:A','SPDT:A','SPDQ:A','PTTEND:A','PTEQ:A',"
-        "'DTV:A','VD01:A','QRL:A','QRS:A','QAP:I','TAP:I',"
-        "'SPQC','SPQI','SPQS','SPQR','SPQG','SPQPEVP'"}
+              "'DTV:A','VD01:A','QRL:A','QRS:A','QAP:I','TAP:I',"
+              "'SPQC','SPQI','SPQS','SPQR','SPQG','SPQPEVP'"}
 
 cam_namelist_hindcast_acme = {
     "nhtfrq": "0,-1,-1,-1",
     "mfilt": "1,24,24,24",
     "fincl2": "'T','Q','Z3','OMEGA','U','V','CLOUD'",
     "fincl3": "'TS','TMQ','PRECT','TREFHT','LHFLX','SHFLX',"
-        "'FLNS','FLNT','FSNS','FSNT','FLUT',"
-        "'CLDLOW','CLDMED','CLDHGH','CLDTOT',"
-        "'U850','U200','V850','V200','OMEGA500',"
-        "'LWCF','SWCF','PS','PSL','QAP:A','TAP:A','PRECC','PRECL'",
+              "'FLNS','FLNT','FSNS','FSNT','FLUT',"
+              "'CLDLOW','CLDMED','CLDHGH','CLDTOT',"
+              "'U850','U200','V850','V200','OMEGA500',"
+              "'LWCF','SWCF','PS','PSL','QAP:A','TAP:A','PRECC','PRECL'",
     "fincl4": "'DTCORE:A','PTTEND:A','PTEQ:A',"
-        "'QRL:A','QRS:A','QAP:I','TAP:I'",
+              "'QRL:A','QRS:A','QAP:I','TAP:I'",
     "empty_htapes": ".true."}
 
 
