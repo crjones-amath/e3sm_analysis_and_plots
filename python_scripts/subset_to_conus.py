@@ -8,13 +8,10 @@ from datetime import timedelta
 
 def subset_and_write_to_file(fname, lons=[220, 300], lats=[20, 50],
                              output_vars=['PRECT', 'FLNT'],
-                             transpose_dims=True, shift_time=True):
+                             transpose_dims=True, shift_time=False):
     print('Processing file ', fname)
     fout = fname.replace('.nc', '.CONUS.nc')
-    fout = fout.replace('/daily/', '/daily/CONUS/')  # quick move to CONUS out-directory
-    # original version:
-    # ds = xr.open_dataset(fname)
-    # ds[['PRECT', 'FLNT']].sel(lat=slice(*lats), lon=slice(*lons)).to_netcdf(fout)
+    # fout = fout.replace('/daily/', '/daily/CONUS/')  # quick move to CONUS out-directory
     if output_vars is None:
         ds = xr.open_dataset(fname).sel(lat=slice(*lats), lon=slice(*lons))
     else:
@@ -30,8 +27,10 @@ def subset_and_write_to_file(fname, lons=[220, 300], lats=[20, 50],
 def main(do_parallel=True):
     # files_sp = glob.glob('/global/project/projectdirs/m3312/crjones/e3sm/early_science/hourly_2d_hist/remap/daily/*.000[2-7]*.nc')
     # files_sp = glob.glob('/global/project/projectdirs/m3312/crjones/e3sm/early_science/hourly_2d_hist/remap/daily/*.0002-05*.nc')
-    # files_e3sm = glob.glob('/global/project/projectdirs/m3312/crjones/e3sm/early_science_e3sm/hourly_2d_hist/remap/daily/*.nc')
-    files_e3sm = glob.glob('/global/project/projectdirs/m3312/crjones/e3sm/early_science_e3sm/hourly_2d_hist/remap/daily/*.000[2-3]*.nc')
+    files_e3sm = glob.glob('/global/project/projectdirs/m3312/crjones/e3sm/early_science_e3sm/hourly_2d_hist/remap/daily/*.000?-0[3-8]*.nc')
+    # files_e3sm = glob.glob('/global/project/projectdirs/m3312/crjones/e3sm/earlyscience.FC5AV1C-L.ne30.E3SM.20190519/remap/*.nc')
+    # files_e3sm = glob.glob('/global/project/projectdirs/m3312/crjones/e3sm/earlyscience.FC5AV1C-L.ne30.sp1_64x1_1000m.20190415/hourly_2d_hist/remap/*.nc')
+    # files_e3sm = glob.glob('/global/project/projectdirs/m3312/crjones/e3sm/early_science_e3sm/hourly_2d_hist/remap/daily/*.000[2-3]*.nc')
 
     if not do_parallel:
         subset_and_write_to_file(files_sp[0])
