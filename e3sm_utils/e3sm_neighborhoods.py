@@ -186,13 +186,14 @@ class ConnectedFeature:
         if self.Graph.has_node(n) and (n not in self._visited) and self.unlabeled_feature[ntime, n]:
             self._visited.append(n)
             self.labeled_feature[ntime, n] = label
-            for neighbor in self.Graph.neighbors_iter(n):
+            for neighbor in self.Graph.neighbors(n):
                 self.floodfill(ntime, neighbor, label)
 
     def label_connections_in_space(self):
         for nt in range(self.time_slices):
             self._visited = []
-            for n in self.Graph.nodes_iter():
+            # for n in self.Graph.nodes_iter():
+            for n in self.Graph.nodes():
                 if self.unlabeled_feature[nt, n] and (n not in self._visited):
                     self._label = self._label + 10
                     self.floodfill(nt, n, label=self._label)
