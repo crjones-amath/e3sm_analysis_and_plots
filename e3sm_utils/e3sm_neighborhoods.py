@@ -116,24 +116,41 @@ def persist_to_file(file_name):
 
 
 @persist_to_file('cache_e3sm_neighborhoods.dat')
-def populate_neighborhoods(e3sm_filename, ref_map_filename):
+def populate_neighborhoods(e3sm_filename, ref_map_filename, debug=True,
+                           **kwargs):
     """Use ref_map_ds to identify neighbors of each grid index in e3sm_ds
 
     Returns: neighbors = dict(key=crm_ds ncol index,
                               val=list of e3sm_ds ncol neighboring indices)
     """
+    if debug:
+        print('Debug is on')
     # need to pass in filename instead of ds for memoization to work
-    e3sm_ds = xr.open_dataset(e3sm_filename)
-    ref_map_ds = xr.open_dataset(ref_map_filename)
+    e3sm_ds = xr.open_dataset(e3sm_filename).load()
+    ref_map_ds = xr.open_dataset(ref_map_filename).load()
+    
+    if debug:
+        print('Loaded e3sm_ds')
+        print('Loaded ref_map_ds')
+        print('indices up next')
 
     # key: e3sm_ds ncol index; val: ref_map_ds ncol index
-    indices = e3sm_master_ncol_index(e3sm_ds, ref_map_ds)
+    indices = e3sm_master_ncol_index(e3sm_ds, ref_map_ds, **kwargs)
+    if debug:
+        print('indices determined')
+        print(len(indices))
 
     # key: ref_map_ds ncol index; val: e3sm_ds ncol index
     ref_ds_to_e3sm_indices = {val: key for key, val in indices.items()}
+    if debug:
+        print('ref_ds_to_e3sm_indices determined')
 
     neighbors = dict()
+    if debug:
+        print('populating neighborhoods')
     for ind_e3sm, ind_ref in indices.items():
+        if debug:
+            print(ind_e3sm, ind_ref)
         neighbors[ind_e3sm] = [ref_ds_to_e3sm_indices[idx]
                                for idx in
                                neighborhood_to_search(ind_e3sm, e3sm_ds,
